@@ -1,36 +1,29 @@
+#### This file is not complete
 sudo: required
-language: generic
-
 services:
   - docker
-
+env:
+  global:
+    - SHA=$(git rev-parse HEAD)
+    - CLOUDSDK_CORE_DISABLE_PROMPTS=1
 before_install:
-  - docker build -t cygnetops/react-test -f ./client/Dockerfile.dev ./client
+  # - openssl command here that is output after encrypting the json file in ruby container. 
+  - curl https://sdk.cloud.google.com | bash > /dev/null;
+  - source $HOME/google-cloud-sdk/path.bash.inc
+  - gcloud components update kubectl
+## Note that google cloud platform project and service account needs to be created for this. 
+  - gcloud auth activate-service-account --key-file service-account.json ## Service account has to be created on Google cloud platform 
+## Set project ID  - gcloud config set project skilful-berm-214822
+## Set project Zone  - gcloud config set compute/zone us-central1-a
+## Get credentials from container  - gcloud container clusters get-credentials multi-cluster
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker build -t tislam93/react-test -f ./client/Dockerfile.dev ./client
 
 script:
-  - docker run -e CI=true cygnetops/react-test npm test
-
-after_success:
-  - docker build -t cygnetops/multi-client-10-14 ./client
-  - docker build -t cygnetops/multi-nginx-10-14 ./nginx
-  - docker build -t cygnetops/multi-server-10-14 ./server
-  - docker build -t cygnetops/multi-worker-10-14 ./worker
-  # Log in to the docker CLI
-  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_ID" --password-stdin
-  # Take those images and push them to docker hub
-  - docker push cygnetops/multi-client-10-14
-  - docker push cygnetops/multi-nginx-10-14
-  - docker push cygnetops/multi-server-10-14
-  - docker push cygnetops/multi-worker-10-14
+  - docker run -e CI=true tislam93/react-test npm test
 
 deploy:
-  provider: elasticbeanstalk
-  region: 'us-east-1'
-  app: 'multi-docker'
-  env: 'MultiDocker-env'
-  bucket_name: 'elasticbeanstalk-us-east-1-923445559289'
-  bucket_path: 'docker-multi'
+  provider: script
+  script: bash ./deploy.sh
   on:
     branch: master
-  access_key_id: $AWS_ACCESS_KEY
-  secret_access_key: $AWS_SECRET_KEY
